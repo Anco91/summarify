@@ -1,7 +1,15 @@
 "use client";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const LANGUAGES = [
-  { value: "", label: "Auto-détection" },
+  { value: "auto", label: "Auto-détection" },
   { value: "fr", label: "Français" },
   { value: "en", label: "English" },
   { value: "de", label: "Deutsch" },
@@ -18,37 +26,22 @@ interface LanguageSelectProps {
   disabled?: boolean;
 }
 
-export function LanguageSelect({
-  value,
-  onChange,
-  disabled = false,
-}: LanguageSelectProps) {
+export function LanguageSelect({ value, onChange, disabled }: LanguageSelectProps) {
   return (
-    <div className="flex flex-col gap-1">
-      <label
-        htmlFor="language-select"
-        className="text-sm font-medium text-gray-700 dark:text-gray-300"
-      >
-        Langue
-      </label>
-      <select
-        id="language-select"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900
-          shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500
-          disabled:cursor-not-allowed disabled:opacity-50
-          dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100
-          dark:focus:border-indigo-400 dark:focus:ring-indigo-400"
-        aria-label="Sélectionner la langue de transcription"
-      >
-        {LANGUAGES.map(({ value: v, label }) => (
-          <option key={v} value={v}>
-            {label}
-          </option>
-        ))}
-      </select>
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor="language-select">Langue</Label>
+      <Select value={value} onValueChange={(v) => onChange(v ?? "auto")} disabled={disabled}>
+        <SelectTrigger id="language-select">
+          <SelectValue placeholder="Auto-détection" />
+        </SelectTrigger>
+        <SelectContent>
+          {LANGUAGES.map(({ value: v, label }) => (
+            <SelectItem key={v} value={v}>
+              {label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
