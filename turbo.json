@@ -1,0 +1,19 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build", "generate:api"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
+    "generate:api": {
+      "inputs": ["../../packages/contracts/openapi.yaml"],
+      "outputs": ["src/shared/api/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": { "outputs": [] },
+    "test": { "outputs": [] }
+  }
+}

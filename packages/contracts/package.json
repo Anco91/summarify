@@ -1,0 +1,5 @@
+{
+"name": "@summarify/contracts",
+"version": "0.1.0",
+"main": "./openapi.yaml"
+}

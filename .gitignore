@@ -1,0 +1,41 @@
+# Env
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.next/
+.turbo/
+
+# Temp audio files
+/tmp/*.mp3
+/tmp/*.wav
+/tmp/*.m4a
+/tmp/*.ogg
+/tmp/*.flac
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Docker
+*.tar
+
+# Models (trop lourds pour git)
+apps/api/models/
+summarify_guide_v3.pdf

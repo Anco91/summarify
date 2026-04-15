@@ -1,0 +1,123 @@
+openapi: "3.0.3"
+info:
+  title: Summarify API
+  description: API de transcription audio et de resume par IA
+  version: "0.1.0"
+servers:
+  - url: http://localhost:8000
+    description: Developpement local
+  - url: https://summarify-api.onrender.com
+    description: Production
+tags:
+  - name: transcription
+    description: Upload et streaming de transcription audio
+  - name: summary
+    description: Resume LLM de texte
+paths:
+  /api/upload:
+    post:
+      tags: [transcription]
+      summary: Upload d'un fichier audio
+      operationId: uploadAudio
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "Formats acceptes : mp3, wav, m4a, ogg, flac"
+      responses:
+        "200":
+          description: Upload reussi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadResponse"
+        "413":
+          description: Fichier trop volumineux
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/stream/{jobId}:
+    get:
+      tags: [transcription]
+      summary: Stream SSE de la transcription
+      description: |
+        Flux Server-Sent Events. Chaque event.data est un segment de texte.
+        Le flux se termine par l'event data: [DONE]
+      operationId: streamTranscription
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Flux SSE actif
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                example: "data: Bonjour tout le monde.\n\n"
+        "404":
+          description: Job introuvable
+  /api/summarize:
+    post:
+      tags: [summary]
+      summary: Resume un texte via LLM
+      operationId: summarizeText
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SummarizeRequest"
+      responses:
+        "200":
+          description: Resume genere
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SummarizeResponse"
+components:
+  schemas:
+    UploadResponse:
+      type: object
+      required: [job_id]
+      properties:
+        job_id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+    SummarizeRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 10
+          description: Texte complet de la transcription a resumer
+    SummarizeResponse:
+      type: object
+      required: [summary, model]
+      properties:
+        summary:
+          type: string
+          description: Resume en 3 points cles genere par le LLM
+        model:
+          type: string
+          description: Identifiant du modele LLM utilise (gpt-4o-mini ou qwen2.5:3b)
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
