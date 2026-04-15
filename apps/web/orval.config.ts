@@ -1,6 +1,7 @@
 import { defineConfig } from "orval";
 
 export default defineConfig({
+  // Output 1: React Query hooks
   summarify: {
     input: {
       target: "../../packages/contracts/openapi.yaml",
@@ -15,6 +16,17 @@ export default defineConfig({
           name: "customInstance",
         },
       },
+    },
+  },
+  // Output 2: Zod schemas (DTOs for client-side validation)
+  summarifyZod: {
+    input: {
+      target: "../../packages/contracts/openapi.yaml",
+    },
+    output: {
+      mode: "single",
+      target: "src/shared/api/schemas.ts",
+      client: "zod",
     },
   },
 });

@@ -1,29 +1,27 @@
 "use client";
-import { useMutation } from "@tanstack/react-query";
+import { useSummarizeText } from "@/shared/api/summary/summary";
+import type { SummarizeResponse } from "@/shared/api/summarifyAPI.schemas";
 
-export interface SummarizeResponse {
-  summary: string;
-  model: string;
-}
+export type { SummarizeResponse };
 
 export function useSummaryMutation() {
-  return useMutation<SummarizeResponse, Error, string>({
-    mutationFn: async (text: string): Promise<SummarizeResponse> => {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/summarize`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
-        }
-      );
+  const mutation = useSummarizeText();
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail ?? `Erreur HTTP ${res.status}`);
-      }
+  const summarize = (text: string) => {
+    mutation.mutate({ data: { text } });
+  };
 
-      return res.json();
-    },
-  });
+  // Orval wraps response: { data: SummarizeResponse, status: 200, headers }
+  const response = mutation.data;
+  const data: SummarizeResponse | undefined =
+    response && "data" in response ? response.data : undefined;
+
+  return {
+    summarize,
+    data,
+    isPending: mutation.isPending,
+    isError: mutation.isError,
+    error: mutation.error as Error | null,
+    reset: mutation.reset,
+  };
 }
