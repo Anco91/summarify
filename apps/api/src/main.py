@@ -34,15 +34,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("startup_cleanup", stale_files_removed=removed)
 
     # Log du backend LLM actif
-    if settings.use_openai:
+    backend = settings.llm_backend
+    if backend == "openai":
         logger.info("llm_backend", provider="openai", model="gpt-4o-mini")
+    elif backend == "groq":
+        logger.info("llm_backend", provider="groq", model="llama-3.3-70b-versatile")
     else:
         logger.warning(
             "llm_backend",
-            provider="ollama",
-            url=settings.OLLAMA_BASE_URL,
-            model=settings.OLLAMA_MODEL,
-            note="Assurez-vous qu'Ollama tourne sur cet hôte",
+            provider="none",
+            note="Aucune clé LLM configurée — /api/summarize retournera 503",
         )
 
     yield

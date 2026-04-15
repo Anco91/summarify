@@ -11,7 +11,7 @@ Transcription audio en temps réel + résumé IA. Upload un fichier audio, récu
 | API client | Orval (hooks react-query + schemas Zod générés depuis OpenAPI) |
 | Backend | FastAPI, Python 3.11, uv |
 | Transcription | faster-whisper (Whisper base local) |
-| LLM résumé | OpenAI `gpt-4o-mini` si `OPENAI_API_KEY` fourni, sinon Ollama `qwen2.5:3b` en local |
+| LLM résumé | Groq `llama-3.3-70b` (gratuit) ou OpenAI `gpt-4o-mini` |
 | Infra | Docker multi-stage, GitHub Actions CI |
 
 ## Démarrage rapide
@@ -20,7 +20,7 @@ Transcription audio en temps réel + résumé IA. Upload un fichier audio, récu
 
 ```bash
 cd apps/api
-cp .env.example .env          # renseigner OPENAI_API_KEY si souhaité
+cp .env.example .env          # renseigner GROQ_API_KEY (gratuit) ou OPENAI_API_KEY
 uv sync
 uv run uvicorn src.main:app --reload
 # → http://localhost:8000/docs
@@ -49,11 +49,12 @@ docker run -p 8000:8000 \
 
 ### API (`apps/api/.env`)
 
+Une seule clé LLM suffit. Priorité : `OPENAI_API_KEY` > `GROQ_API_KEY`.
+
 | Variable | Défaut | Description |
 |----------|--------|-------------|
-| `OPENAI_API_KEY` | _(vide)_ | Si fourni, utilise OpenAI. Sinon, Ollama. |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | URL du serveur Ollama |
-| `OLLAMA_MODEL` | `qwen2.5:3b` | Modèle Ollama pour le résumé |
+| `GROQ_API_KEY` | _(vide)_ | **Recommandé** — gratuit, sans CB. [console.groq.com](https://console.groq.com) |
+| `OPENAI_API_KEY` | _(vide)_ | Optionnel — prend le dessus sur Groq si défini |
 | `WHISPER_MODEL` | `base` | Taille du modèle Whisper (`tiny` / `base` / `small` / `medium`) |
 | `ALLOWED_ORIGINS` | `http://localhost:3000` | CORS — séparés par virgule ou JSON array |
 | `MAX_UPLOAD_SIZE_MB` | `50` | Limite upload |
@@ -91,7 +92,7 @@ summarify/
 │   │   └── src/
 │   │       ├── domain/          # ports (interfaces)
 │   │       ├── application/     # use cases
-│   │       ├── infrastructure/  # Whisper, OpenAI, Ollama
+│   │       ├── infrastructure/  # Whisper, OpenAI, Groq
 │   │       └── presentation/    # routers, schemas
 │   └── web/                     # Next.js
 │       └── src/

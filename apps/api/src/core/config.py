@@ -27,17 +27,19 @@ class _FlexEnvSource(EnvSettingsSource):
 class Settings(BaseSettings):
     # Chargees depuis .env automatiquement
     OPENAI_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
-    WHISPER_MODEL: str = "base"  # tiny/base/small/medium selon RAM disponible
+    WHISPER_MODEL: str = "base"
     MAX_UPLOAD_SIZE_MB: int = 50
     MAX_CONCURRENT_TRANSCRIPTIONS: int = 1
-    # LLM local (Ollama) — utilise si OPENAI_API_KEY est vide
-    OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "qwen2.5:3b"  # bon rapport qualite/taille, supporte le francais
 
     @property
-    def use_openai(self) -> bool:
-        return bool(self.OPENAI_API_KEY)
+    def llm_backend(self) -> str:
+        if self.OPENAI_API_KEY:
+            return "openai"
+        if self.GROQ_API_KEY:
+            return "groq"
+        return "none"
 
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 
