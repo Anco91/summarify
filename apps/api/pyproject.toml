@@ -10,6 +10,8 @@ dependencies = [
     "openai>=2.31.0",
     "pydantic-settings>=2.0.0",
     "python-multipart>=0.0.26",
+    "slowapi>=0.1.9",
+    "structlog>=25.5.0",
     "uvicorn[standard]>=0.44.0",
 ]
 
@@ -24,7 +26,7 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
+testpaths = ["src/tests"]
 # Toutes les fonctions async sont testees automatiquement
 [tool.ruff]
 line-length = 88

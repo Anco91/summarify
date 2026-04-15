@@ -1,106 +1,109 @@
-import pytest
+"""
+Tests unitaires — TranscribeUseCase.
+Aucun import Whisper, aucun fichier audio réel : on injecte des faux ports.
+"""
 import asyncio
-from unittest.mock import patch, MagicMock
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
-# On importe uniquement le Domaine (l'interface) et le Use Case
-# L'infrastructure (Whisper) N'EST PAS IMPORTÉE
-from src.domain.transcription.ports import ITranscriptionPort
+import pytest
+
 from src.application.transcription.use_cases import TranscribeUseCase
+from src.domain.transcription.ports import ITranscriptionPort
 
+# ──────────────────────────────────────────────
+# Test doubles (Tell Don't Ask / Dependency Inversion)
+# ──────────────────────────────────────────────
 
-class FakeSuccessTranscription(ITranscriptionPort):
-    """Simule un Whisper qui marche bien."""
+class _SuccessPort(ITranscriptionPort):
+    """Simule Whisper qui retourne 2 segments."""
 
-    async def transcribe(self, file_path: str) -> AsyncIterator[str]:
+    def __init__(self, captured_language: list[str | None] | None = None) -> None:
+        self._captured = captured_language
+
+    async def transcribe(
+        self, file_path: str, language: str | None = None
+    ) -> AsyncIterator[str]:
+        if self._captured is not None:
+            self._captured.append(language)
         yield "Bonjour "
-        yield "le "
+        yield "le monde."
 
 
-class FakeFailingTranscription(ITranscriptionPort):
-    """Simule un Whisper qui crashe (ex: erreur de mémoire)."""
+class _ErrorPort(ITranscriptionPort):
+    """Simule Whisper qui plante."""
 
-    async def transcribe(self, file_path: str) -> AsyncIterator[str]:
-        raise Exception("OOM Killed : Pas assez de RAM")
-        yield  # Uniquement pour satisfaire le typage AsyncIterator
+    async def transcribe(
+        self, file_path: str, language: str | None = None
+    ) -> AsyncIterator[str]:
+        raise RuntimeError("OOM : mémoire insuffisante")
+        yield  # satisfaire le type AsyncIterator
+
+
+# ──────────────────────────────────────────────
+# Tests
+# ──────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_execute_yields_raw_text_segments() -> None:
+    """Le use case yield du texte brut — pas de formatage SSE (SRP)."""
+    use_case = TranscribeUseCase(_SuccessPort(), asyncio.Semaphore(1))
+
+    results = [chunk async for chunk in use_case.execute("fake_path")]
+
+    assert results == ["Bonjour ", "le monde."]
 
 
 @pytest.mark.asyncio
-async def test_use_case_should_format_text_to_sse():
-    """Test le chemin heureux : Le texte doit être formaté en SSE."""
-    # Arrange (On donne un faux service au Use Case)
-    use_case = TranscribeUseCase(
-        transcription_port=FakeSuccessTranscription(), semaphore=asyncio.Semaphore(1)
-    )
+async def test_execute_passes_language_to_port() -> None:
+    """Le paramètre language est transmis au port sans transformation."""
+    captured: list[str | None] = []
+    use_case = TranscribeUseCase(_SuccessPort(captured), asyncio.Semaphore(1))
 
-    # Act (On consomme le générateur)
-    results = []
-    async for chunk in use_case.execute(file_path="fake_audio"):
-        results.append(chunk)
+    async for _ in use_case.execute("fake_path", language="fr"):
+        pass
 
-    # Assert (Le format SSE est-il respecté ?)
-    assert len(results) == 3
-    assert results[0] == "data: Bonjour \n\n"
-    assert results[1] == "data: le \n\n"
-    assert results[2] == "data: done\n\n"
+    assert captured == ["fr"]
 
 
 @pytest.mark.asyncio
-async def test_use_case_should_delete_temp_file_on_success():
-    """Version plus lisible avec les context managers."""
+async def test_execute_deletes_file_on_success(  # noqa: E501
+    tmp_path: pytest.TempPathFactory,
+) -> None:
+    """Le fichier temporaire est supprimé après transcription réussie."""
+    audio = tmp_path / "audio.mp3"  # type: ignore[operator]
+    audio.write_bytes(b"fake audio data")
 
-    # Arrange
-    with (
-        patch("src.application.transcription.use_cases.os.remove") as mock_remove,
-        patch(
-            "src.application.transcription.use_cases.os.path.exists", return_value=True
-        ),
-        patch(
-            "src.application.transcription.use_cases.tempfile.NamedTemporaryFile"
-        ) as mock_temp,
-    ):
-        mock_file = MagicMock()
-        mock_file.name = "/tmp/fake_audio"
-        mock_temp.return_value.__enter__.return_value = mock_file
+    use_case = TranscribeUseCase(_SuccessPort(), asyncio.Semaphore(1))
+    async for _ in use_case.execute(str(audio)):
+        pass
 
-        use_case = TranscribeUseCase(
-            transcription_port=FakeSuccessTranscription(),
-            semaphore=asyncio.Semaphore(1),
-        )
+    assert not audio.exists()
 
-        # Act
-        async for _ in use_case.execute(file_path="/tmp/fake_audio"):
+
+@pytest.mark.asyncio
+async def test_execute_deletes_file_on_error(tmp_path: pytest.TempPathFactory) -> None:
+    """Le fichier temporaire est supprimé même si Whisper plante (finally garanti)."""
+    audio = tmp_path / "audio.mp3"  # type: ignore[operator]
+    audio.write_bytes(b"fake audio data")
+
+    use_case = TranscribeUseCase(_ErrorPort(), asyncio.Semaphore(1))
+
+    with pytest.raises(RuntimeError, match="OOM"):
+        async for _ in use_case.execute(str(audio)):
             pass
 
-        # Assert
-        mock_remove.assert_called_once_with("/tmp/fake_audio")
+    assert not audio.exists()
 
 
-async def test_use_case_should_delete_temp_file_even_on_error():
-    """Test la sécurité : Le fichier temp DOIT être supprimé même en cas d'erreur."""
-    # Arrange
-    with (
-        patch("src.application.transcription.use_cases.os.remove") as mock_remove,
-        patch(
-            "src.application.transcription.use_cases.os.path.exists", return_value=True
-        ),
-        patch(
-            "src.application.transcription.use_cases.tempfile.NamedTemporaryFile"
-        ) as mock_temp,
-    ):
-        mock_file = MagicMock()
-        mock_file.name = "/tmp/fake_audio"
-        mock_temp.return_value.__enter__.return_value = mock_file
+@pytest.mark.asyncio
+async def test_execute_respects_semaphore() -> None:
+    """Avec semaphore(1), deux exécutions ne se chevauchent pas."""
+    sem = asyncio.Semaphore(1)
+    use_case = TranscribeUseCase(_SuccessPort(), sem)
 
-        use_case = TranscribeUseCase(
-            transcription_port=FakeFailingTranscription(),
-            semaphore=asyncio.Semaphore(1),
-        )
+    # Les deux doivent compléter sans deadlock
+    results_a = [c async for c in use_case.execute("a")]
+    results_b = [c async for c in use_case.execute("b")]
 
-        # Act
-        with pytest.raises(Exception):
-            async for _ in use_case.execute(file_path="/tmp/fake_audio"):
-                pass
-
-        # Assert
-        mock_remove.assert_called_once_with("/tmp/fake_audio")
+    assert len(results_a) == 2
+    assert len(results_b) == 2

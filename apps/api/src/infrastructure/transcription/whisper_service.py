@@ -1,41 +1,62 @@
-from faster_whisper import WhisperModel
 import asyncio
-from typing import AsyncIterator
+import os
+from collections.abc import AsyncIterator
+
+from faster_whisper import WhisperModel
+
 from src.core.config import get_settings
+from src.core.logging import get_logger
 from src.domain.transcription.ports import ITranscriptionPort
+
+logger = get_logger(__name__)
+
+# En dev local, /app/models n'existe pas — on autorise le téléchargement
+_LOCAL_DEV = not os.path.isdir("/app/models")
 
 
 class WhisperService(ITranscriptionPort):
-    _instance: "WhisperService | None" = None  # Singleton
+    """Adaptateur faster-whisper. Singleton — le modèle n'est chargé qu'une fois."""
+
+    _instance: "WhisperService | None" = None
 
     def __new__(cls) -> "WhisperService":
-        # Singleton pattern : le modele n'est charge qu'une seule fois
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         if hasattr(self, "_initialized"):
             return
         settings = get_settings()
+        logger.info("whisper_loading", model=settings.WHISPER_MODEL)
         self.model = WhisperModel(
             settings.WHISPER_MODEL,
             device="cpu",
-            compute_type="int8",  # Quantification int8 : 2x moins de RAM
-            download_root="/app/models",  # Dossier pre-rempli par le Dockerfile
-            local_files_only=True,  # Interdit le telechargement au runtime
+            compute_type="int8",
+            download_root="/app/models" if not _LOCAL_DEV else None,
+            local_files_only=not _LOCAL_DEV,
         )
         self._initialized = True
+        logger.info("whisper_ready", model=settings.WHISPER_MODEL)
 
-    async def transcribe(self, file_path: str) -> AsyncIterator[str]:
-        # Whisper est synchrone : run_in_executor evite de bloquer l'event loop
-        loop = asyncio.get_event_loop()
-        segments, _ = await loop.run_in_executor(
+    async def transcribe(
+        self, file_path: str, language: str | None = None
+    ) -> AsyncIterator[str]:
+        """Lance la transcription dans un executor pour ne pas bloquer l'event loop."""
+        loop = asyncio.get_running_loop()
+        segments, info = await loop.run_in_executor(
             None,
             lambda: self.model.transcribe(
-                file_path, language=None, beam_size=5
-            ),  # beam_size : nombre de chemins a explorer
+                file_path,
+                language=language,  # None = autodétection
+                beam_size=5,
+            ),
+        )
+        logger.debug(
+            "whisper_detected_language",
+            language=info.language,
+            probability=round(info.language_probability, 2),
         )
         for segment in segments:
-            if segment.text.strip():  # ignorer les segments vides
+            if segment.text.strip():
                 yield segment.text

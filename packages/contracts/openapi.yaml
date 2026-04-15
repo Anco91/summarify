@@ -59,6 +59,13 @@ paths:
           schema:
             type: string
             format: uuid
+        - in: query
+          name: lang
+          required: false
+          schema:
+            type: string
+            pattern: "^[a-z]{2}$"
+          description: "Code ISO 639-1 (fr, en, de…)"
       responses:
         "200":
           description: Flux SSE actif

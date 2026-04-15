@@ -1,7 +1,9 @@
-# src/presentation/schemas.py (Généré automatiquement)
 from pydantic import BaseModel
 
 
-# Modèle de réponse généré depuis openapi.yaml
-class TranscriptionResponse(BaseModel):
-    message: str
+class UploadResponse(BaseModel):
+    job_id: str
+
+
+class ErrorResponse(BaseModel):
+    detail: str

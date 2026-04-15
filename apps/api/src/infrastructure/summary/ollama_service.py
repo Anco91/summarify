@@ -1,6 +1,7 @@
 from openai import AsyncOpenAI  # Ollama expose une API compatible OpenAI
-from src.domain.summary.ports import ILLMService
+
 from src.core.config import get_settings
+from src.domain.summary.ports import ILLMService
 
 _SYSTEM_PROMPT = (
     "Tu es un assistant de synthese. Resume le texte fourni en "

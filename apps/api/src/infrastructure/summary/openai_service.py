@@ -1,4 +1,5 @@
 from openai import AsyncOpenAI
+
 from src.domain.summary.ports import ILLMService
 
 _SYSTEM_PROMPT = (

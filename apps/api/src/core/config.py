@@ -1,8 +1,12 @@
-import json
 from functools import lru_cache
-from typing import Any, Tuple, Type
+from typing import Any
 
-from pydantic_settings import BaseSettings, EnvSettingsSource, PydanticBaseSettingsSource
+from pydantic import ConfigDict
+from pydantic_settings import (
+    BaseSettings,
+    EnvSettingsSource,
+    PydanticBaseSettingsSource,
+)
 
 
 class _FlexEnvSource(EnvSettingsSource):
@@ -35,18 +39,16 @@ class Settings(BaseSettings):
     def use_openai(self) -> bool:
         return bool(self.OPENAI_API_KEY)
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @classmethod
     def settings_customise_sources(
         cls,
-        settings_cls: Type[BaseSettings],
+        settings_cls: type[BaseSettings],
         init_settings: PydanticBaseSettingsSource,
         env_settings: PydanticBaseSettingsSource,
         **kwargs: Any,
-    ) -> Tuple[PydanticBaseSettingsSource, ...]:
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
         return (
             init_settings,
             _FlexEnvSource(settings_cls),
