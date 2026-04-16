@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from src.application.summary.use_cases import SummarizeTextUseCase
 from src.core.config import get_settings
@@ -8,6 +10,7 @@ from src.infrastructure.summary.openai_service import OpenAIService
 from src.presentation.summary.schemas import SummarizeRequest, SummarizeResponse
 
 router = APIRouter(prefix="/api", tags=["summary"])
+limiter = Limiter(key_func=get_remote_address)
 
 
 def _get_llm_service() -> tuple[ILLMService, str]:
@@ -27,7 +30,8 @@ def _get_llm_service() -> tuple[ILLMService, str]:
     response_model=SummarizeResponse,
     summary="Résume un texte via LLM",
 )
-async def summarize_text(body: SummarizeRequest) -> SummarizeResponse:
+@limiter.limit("10/minute")  # noqa: B008
+async def summarize_text(request: Request, body: SummarizeRequest) -> SummarizeResponse:
     service, model_name = _get_llm_service()
     use_case = SummarizeTextUseCase(service)
     summary = await use_case.execute(body.text)

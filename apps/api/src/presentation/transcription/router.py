@@ -80,8 +80,8 @@ async def upload_audio(request: Request, file: UploadFile = File(...)) -> JSONRe
         )
 
     job_id = str(uuid.uuid4())
-    safe_name = f"{job_id}_{file.filename or 'audio'}"
-    path = f"/tmp/{safe_name}"
+    # On ignore le nom fourni par le client — UUID seul évite toute injection de path
+    path = f"/tmp/{job_id}.audio"
 
     with open(path, "wb") as f:
         f.write(content)

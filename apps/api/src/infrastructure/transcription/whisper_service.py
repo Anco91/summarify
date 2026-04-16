@@ -51,7 +51,7 @@ class WhisperService(ITranscriptionPort):
             lambda: self.model.transcribe(
                 file_path,
                 language=language,  # None = autodétection
-                beam_size=5,
+                beam_size=1,  # greedy — 3-5x plus rapide sur CPU, qualité suffisante
             ),
         )
         logger.debug(
