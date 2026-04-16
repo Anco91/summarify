@@ -9,8 +9,8 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from src.core.config import get_settings
-from src.core.job_store import job_store
 from src.core.logging import configure_logging, get_logger
+from src.core.session_store import session_store
 from src.presentation.summary.router import router as summary_router
 from src.presentation.transcription.router import limiter
 from src.presentation.transcription.router import router as transcription_router
@@ -28,10 +28,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from src.infrastructure.transcription.whisper_service import WhisperService
     WhisperService()
 
-    # Nettoyage /tmp : fichiers audio orphelins > 1h
-    removed = await job_store.cleanup_stale(max_age_s=3600)
+    # Nettoyage : sessions expirées > 1h
+    removed = await session_store.cleanup_stale(max_age_s=3600)
     if removed:
-        logger.info("startup_cleanup", stale_files_removed=removed)
+        logger.info("startup_cleanup", stale_sessions_removed=removed)
 
     # Log du backend LLM actif
     backend = settings.llm_backend

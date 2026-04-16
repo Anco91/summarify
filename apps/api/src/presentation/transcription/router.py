@@ -1,22 +1,34 @@
 import asyncio
+import contextlib
+import re
 import uuid
+from collections.abc import AsyncGenerator
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
 from fastapi.responses import JSONResponse, StreamingResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from src.application.transcription.use_cases import TranscribeUseCase
 from src.core.config import get_settings
-from src.core.job_store import job_store
-from src.domain.transcription.ports import ITranscriptionPort
+from src.core.logging import get_logger
+from src.core.session_store import SessionState, session_store
 from src.infrastructure.transcription.whisper_service import WhisperService
 from src.presentation.transcription.schemas import UploadResponse
-from src.presentation.transcription.sse_formatter import SseFormatter
 
 router = APIRouter(prefix="/api", tags=["transcription"])
 limiter = Limiter(key_func=get_remote_address)
+logger = get_logger(__name__)
 
 # Semaphore global : limite les transcriptions simultanées (protection RAM)
 _SEMAPHORE = asyncio.Semaphore(get_settings().MAX_CONCURRENT_TRANSCRIPTIONS)
@@ -35,14 +47,71 @@ _ACCEPTED_MIME = {
 }
 
 
-def get_transcription_service() -> ITranscriptionPort:
-    return WhisperService()
+async def _run_transcription(
+    session_id: str, file_path: str, language: str | None
+) -> None:
+    """Background task : transcrit le fichier et écrit dans le session_store."""
+    use_case = TranscribeUseCase(WhisperService(), _SEMAPHORE)
+    try:
+        await session_store.update_status(session_id, "transcribing")
+        async for text in use_case.execute(file_path, language):
+            await session_store.add_segment(session_id, text)
+        await session_store.mark_done(session_id)
+    except Exception:
+        logger.exception("transcription_bg_error", session_id=session_id)
+        await session_store.mark_error(session_id, "Erreur interne de transcription")
+        # Le fichier est nettoyé par TranscribeUseCase.execute() dans son finally
 
 
-def get_transcribe_use_case(
-    service: ITranscriptionPort = Depends(get_transcription_service),  # noqa: B008
-) -> TranscribeUseCase:
-    return TranscribeUseCase(service, _SEMAPHORE)
+async def _sse_generator(state: SessionState) -> AsyncGenerator[str, None]:
+    """
+    Génère les événements SSE pour un client.
+
+    Envoie d'abord les segments déjà buffés (reconnexion), puis les
+    segments live via un asyncio.Queue fan-out. Supporte plusieurs
+    clients connectés simultanément sur la même session.
+    """
+    queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+    # Snapshot atomique avant souscription (asyncio single-thread : pas d'await
+    # entre les deux lignes → aucun segment ne peut être manqué ou dupliqué)
+    cursor = len(state.segments)
+    state.subscribers.append(queue)
+
+    with contextlib.suppress(Exception):
+        # 1. Segments déjà buffés (replay pour reconnexion)
+        for seg in state.segments[:cursor]:
+            yield f"data: {seg}\n\n"
+
+        # 2. Session terminée avant connexion → flush queue + fermer
+        if state.status in ("done", "error"):
+            while not queue.empty():
+                item = queue.get_nowait()
+                if item is not None:
+                    yield f"data: {item}\n\n"
+            yield "data: [DONE]\n\n"
+            return
+
+        # 3. Segments live
+        while True:
+            try:
+                item = await asyncio.wait_for(queue.get(), timeout=30)
+            except TimeoutError:
+                yield ": keep-alive\n\n"
+                continue
+
+            if item is None:  # sentinel [DONE]
+                while not queue.empty():
+                    remaining = queue.get_nowait()
+                    if remaining is not None:
+                        yield f"data: {remaining}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+
+            yield f"data: {item}\n\n"
+
+    with contextlib.suppress(ValueError):
+        state.subscribers.remove(queue)
 
 
 @router.post(
@@ -51,8 +120,16 @@ def get_transcribe_use_case(
     summary="Upload d'un fichier audio",
     status_code=200,
 )
-@limiter.limit("5/minute")
-async def upload_audio(request: Request, file: UploadFile = File(...)) -> JSONResponse:  # noqa: B008
+@limiter.limit("5/minute")  # noqa: B008
+async def upload_audio(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),  # noqa: B008
+    lang: Annotated[
+        str | None,
+        Form(description="Code ISO 639-1 (fr, en…). Absent = auto-détection."),
+    ] = None,
+) -> JSONResponse:
     settings = get_settings()
 
     # Validation MIME côté serveur
@@ -79,32 +156,45 @@ async def upload_audio(request: Request, file: UploadFile = File(...)) -> JSONRe
             ),
         )
 
-    job_id = str(uuid.uuid4())
-    # On ignore le nom fourni par le client — UUID seul évite toute injection de path
-    path = f"/tmp/{job_id}.audio"
+    # Normalise lang (format ISO 639-1 : 2 lettres minuscules)
+    if lang and not re.match(r"^[a-z]{2}$", lang):
+        lang = None
+
+    session_id = str(uuid.uuid4())
+    path = f"/tmp/{session_id}.audio"
 
     with open(path, "wb") as f:
         f.write(content)
 
-    await job_store.put(job_id, path)
-    return JSONResponse({"job_id": job_id})
+    await session_store.create(
+        session_id=session_id,
+        filename=file.filename or "audio",
+        language=lang,
+    )
+
+    # Lance la transcription en arrière-plan (non-bloquant pour le client)
+    background_tasks.add_task(_run_transcription, session_id, path, lang)
+
+    return JSONResponse({"session_id": session_id})
 
 
-@router.get("/stream/{job_id}", summary="Stream SSE de la transcription")
-async def stream_transcription(
-    job_id: str,
-    lang: Annotated[
+@router.get("/session/{session_id}/stream", summary="Stream SSE de la transcription")
+async def stream_session(
+    session_id: str,
+    _lang: Annotated[
         str | None,
-        Query(pattern=r"^[a-z]{2}$", description="Code ISO 639-1 (fr, en, de…)"),
+        Query(alias="lang", description="Ignoré — la langue est fixée à l'upload."),
     ] = None,
-    use_case: TranscribeUseCase = Depends(get_transcribe_use_case),  # noqa: B008
 ) -> StreamingResponse:
-    file_path = await job_store.pop(job_id)
-    if file_path is None:
-        raise HTTPException(status_code=404, detail="Job introuvable ou expiré")
+    state = await session_store.get(session_id)
+    if state is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Session introuvable ou expirée. Veuillez uploader à nouveau.",
+        )
 
     return StreamingResponse(
-        SseFormatter.format(use_case.execute(file_path, language=lang)),
+        _sse_generator(state),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

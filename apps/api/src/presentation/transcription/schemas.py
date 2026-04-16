@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 
 class UploadResponse(BaseModel):
-    job_id: str
+    session_id: str
 
 
 class ErrorResponse(BaseModel):
