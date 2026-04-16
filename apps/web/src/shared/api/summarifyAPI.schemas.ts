@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 export interface UploadResponse {
-  job_id: string;
+  session_id: string;
 }
 
 export interface SummarizeRequest {
@@ -31,13 +31,10 @@ export interface ErrorResponse {
 export type UploadAudioBody = {
   /** Formats acceptes : mp3, wav, m4a, ogg, flac */
   file: Blob;
-};
-
-export type StreamTranscriptionParams = {
-/**
- * Code ISO 639-1 (fr, en, de…)
- * @pattern ^[a-z]{2}$
- */
-lang?: string;
+  /**
+     * Code ISO 639-1 (fr, en…). Absent = auto-detection.
+     * @pattern ^[a-z]{2}$
+     */
+  lang?: string;
 };
 

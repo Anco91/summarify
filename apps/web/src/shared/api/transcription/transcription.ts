@@ -26,7 +26,6 @@ import type {
 
 import type {
   ErrorResponse,
-  StreamTranscriptionParams,
   UploadAudioBody,
   UploadResponse
 } from '../summarifyAPI.schemas';
@@ -71,6 +70,9 @@ export const getUploadAudioUrl = () => {
 export const uploadAudio = async (uploadAudioBody: UploadAudioBody, options?: RequestInit): Promise<uploadAudioResponse> => {
     const formData = new FormData();
 formData.append(`file`, uploadAudioBody.file);
+if(uploadAudioBody.lang !== undefined) {
+ formData.append(`lang`, uploadAudioBody.lang);
+ }
 
   return customInstance<uploadAudioResponse>(getUploadAudioUrl(),
   {
@@ -131,49 +133,41 @@ export const useUploadAudio = <TError = ErrorResponse,
     }
     /**
  * Flux Server-Sent Events. Chaque event.data est un segment de texte.
-Le flux se termine par l'event data: [DONE]
+Le flux se termine par l'event data: [DONE].
+Supporte la reconnexion : les segments deja emis sont rejoues.
 
  * @summary Stream SSE de la transcription
  */
-export type streamTranscriptionResponse200 = {
+export type streamSessionResponse200 = {
   data: string
   status: 200
 }
 
-export type streamTranscriptionResponse404 = {
+export type streamSessionResponse404 = {
   data: void
   status: 404
 }
 
-export type streamTranscriptionResponseSuccess = (streamTranscriptionResponse200) & {
+export type streamSessionResponseSuccess = (streamSessionResponse200) & {
   headers: Headers;
 };
-export type streamTranscriptionResponseError = (streamTranscriptionResponse404) & {
+export type streamSessionResponseError = (streamSessionResponse404) & {
   headers: Headers;
 };
 
-export type streamTranscriptionResponse = (streamTranscriptionResponseSuccess | streamTranscriptionResponseError)
+export type streamSessionResponse = (streamSessionResponseSuccess | streamSessionResponseError)
 
-export const getStreamTranscriptionUrl = (jobId: string,
-    params?: StreamTranscriptionParams,) => {
-  const normalizedParams = new URLSearchParams();
+export const getStreamSessionUrl = (sessionId: string,) => {
 
-  Object.entries(params || {}).forEach(([key, value]) => {
 
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
 
-  const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/stream/${jobId}?${stringifiedParams}` : `/api/stream/${jobId}`
+  return `/api/session/${sessionId}/stream`
 }
 
-export const streamTranscription = async (jobId: string,
-    params?: StreamTranscriptionParams, options?: RequestInit): Promise<streamTranscriptionResponse> => {
+export const streamSession = async (sessionId: string, options?: RequestInit): Promise<streamSessionResponse> => {
 
-  return customInstance<streamTranscriptionResponse>(getStreamTranscriptionUrl(jobId,params),
+  return customInstance<streamSessionResponse>(getStreamSessionUrl(sessionId),
   {
     ...options,
     method: 'GET'
@@ -186,75 +180,69 @@ export const streamTranscription = async (jobId: string,
 
 
 
-export const getStreamTranscriptionQueryKey = (jobId: string,
-    params?: StreamTranscriptionParams,) => {
+export const getStreamSessionQueryKey = (sessionId: string,) => {
     return [
-    `/api/stream/${jobId}`, ...(params ? [params] : [])
+    `/api/session/${sessionId}/stream`
     ] as const;
     }
 
 
-export const getStreamTranscriptionQueryOptions = <TData = Awaited<ReturnType<typeof streamTranscription>>, TError = void>(jobId: string,
-    params?: StreamTranscriptionParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamTranscription>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getStreamSessionQueryOptions = <TData = Awaited<ReturnType<typeof streamSession>>, TError = void>(sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamSession>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getStreamTranscriptionQueryKey(jobId,params);
+  const queryKey =  queryOptions?.queryKey ?? getStreamSessionQueryKey(sessionId);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof streamTranscription>>> = ({ signal }) => streamTranscription(jobId,params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof streamSession>>> = ({ signal }) => streamSession(sessionId, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(jobId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof streamTranscription>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: !!(sessionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof streamSession>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type StreamTranscriptionQueryResult = NonNullable<Awaited<ReturnType<typeof streamTranscription>>>
-export type StreamTranscriptionQueryError = void
+export type StreamSessionQueryResult = NonNullable<Awaited<ReturnType<typeof streamSession>>>
+export type StreamSessionQueryError = void
 
 
-export function useStreamTranscription<TData = Awaited<ReturnType<typeof streamTranscription>>, TError = void>(
- jobId: string,
-    params: undefined |  StreamTranscriptionParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamTranscription>>, TError, TData>> & Pick<
+export function useStreamSession<TData = Awaited<ReturnType<typeof streamSession>>, TError = void>(
+ sessionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamSession>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof streamTranscription>>,
+          Awaited<ReturnType<typeof streamSession>>,
           TError,
-          Awaited<ReturnType<typeof streamTranscription>>
+          Awaited<ReturnType<typeof streamSession>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useStreamTranscription<TData = Awaited<ReturnType<typeof streamTranscription>>, TError = void>(
- jobId: string,
-    params?: StreamTranscriptionParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamTranscription>>, TError, TData>> & Pick<
+export function useStreamSession<TData = Awaited<ReturnType<typeof streamSession>>, TError = void>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamSession>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof streamTranscription>>,
+          Awaited<ReturnType<typeof streamSession>>,
           TError,
-          Awaited<ReturnType<typeof streamTranscription>>
+          Awaited<ReturnType<typeof streamSession>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useStreamTranscription<TData = Awaited<ReturnType<typeof streamTranscription>>, TError = void>(
- jobId: string,
-    params?: StreamTranscriptionParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamTranscription>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function useStreamSession<TData = Awaited<ReturnType<typeof streamSession>>, TError = void>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamSession>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Stream SSE de la transcription
  */
 
-export function useStreamTranscription<TData = Awaited<ReturnType<typeof streamTranscription>>, TError = void>(
- jobId: string,
-    params?: StreamTranscriptionParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamTranscription>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function useStreamSession<TData = Awaited<ReturnType<typeof streamSession>>, TError = void>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamSession>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getStreamTranscriptionQueryOptions(jobId,params,options)
+  const queryOptions = getStreamSessionQueryOptions(sessionId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

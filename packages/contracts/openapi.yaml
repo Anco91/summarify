@@ -31,6 +31,10 @@ paths:
                   type: string
                   format: binary
                   description: "Formats acceptes : mp3, wav, m4a, ogg, flac"
+                lang:
+                  type: string
+                  pattern: "^[a-z]{2}$"
+                  description: "Code ISO 639-1 (fr, en…). Absent = auto-detection."
       responses:
         "200":
           description: Upload reussi
@@ -44,28 +48,22 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /api/stream/{jobId}:
+  /api/session/{sessionId}/stream:
     get:
       tags: [transcription]
       summary: Stream SSE de la transcription
       description: |
         Flux Server-Sent Events. Chaque event.data est un segment de texte.
-        Le flux se termine par l'event data: [DONE]
-      operationId: streamTranscription
+        Le flux se termine par l'event data: [DONE].
+        Supporte la reconnexion : les segments deja emis sont rejoues.
+      operationId: streamSession
       parameters:
         - in: path
-          name: jobId
+          name: sessionId
           required: true
           schema:
             type: string
             format: uuid
-        - in: query
-          name: lang
-          required: false
-          schema:
-            type: string
-            pattern: "^[a-z]{2}$"
-          description: "Code ISO 639-1 (fr, en, de…)"
       responses:
         "200":
           description: Flux SSE actif
@@ -75,7 +73,7 @@ paths:
                 type: string
                 example: "data: Bonjour tout le monde.\n\n"
         "404":
-          description: Job introuvable
+          description: Session introuvable ou expiree
   /api/summarize:
     post:
       tags: [summary]
@@ -98,9 +96,9 @@ components:
   schemas:
     UploadResponse:
       type: object
-      required: [job_id]
+      required: [session_id]
       properties:
-        job_id:
+        session_id:
           type: string
           format: uuid
           example: "550e8400-e29b-41d4-a716-446655440000"

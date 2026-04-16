@@ -10,30 +10,28 @@ import * as zod from 'zod';
 /**
  * @summary Upload d'un fichier audio
  */
+export const uploadAudioBodyLangRegExp = new RegExp('^[a-z]{2}$');
+
+
 export const UploadAudioBody = zod.object({
-  "file": zod.instanceof(File)
+  "file": zod.instanceof(File),
+  "lang": zod.string().regex(uploadAudioBodyLangRegExp).optional().describe('Code ISO 639-1 (fr, en…). Absent = auto-detection.')
 })
 
 export const UploadAudioResponse = zod.object({
-  "job_id": zod.uuid()
+  "session_id": zod.uuid()
 })
 
 
 /**
  * Flux Server-Sent Events. Chaque event.data est un segment de texte.
-Le flux se termine par l'event data: [DONE]
+Le flux se termine par l'event data: [DONE].
+Supporte la reconnexion : les segments deja emis sont rejoues.
 
  * @summary Stream SSE de la transcription
  */
-export const StreamTranscriptionParams = zod.object({
-  "jobId": zod.uuid()
-})
-
-export const streamTranscriptionQueryLangRegExp = new RegExp('^[a-z]{2}$');
-
-
-export const StreamTranscriptionQueryParams = zod.object({
-  "lang": zod.string().regex(streamTranscriptionQueryLangRegExp).optional().describe('Code ISO 639-1 (fr, en, de…)')
+export const StreamSessionParams = zod.object({
+  "sessionId": zod.uuid()
 })
 
 

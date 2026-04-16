@@ -11,7 +11,7 @@ export interface TranscriptionState {
 }
 
 export interface UseTranscriptionSSEReturn extends TranscriptionState {
-  startStream: (jobId: string, lang?: string) => void;
+  startStream: (sessionId: string, lang?: string) => void;
   reset: () => void;
 }
 
@@ -25,10 +25,8 @@ const IDLE: TranscriptionState = {
   startedAt: null,
 };
 
-function buildStreamUrl(jobId: string, lang?: string): string {
-  const url = new URL(`${BASE_URL}/api/stream/${jobId}`);
-  if (lang) url.searchParams.set("lang", lang);
-  return url.toString();
+function buildStreamUrl(sessionId: string): string {
+  return `${BASE_URL}/api/session/${sessionId}/stream`;
 }
 
 export function useTranscriptionSSE(): UseTranscriptionSSEReturn {
@@ -36,22 +34,20 @@ export function useTranscriptionSSE(): UseTranscriptionSSEReturn {
 
   const esRef = useRef<EventSource | null>(null);
   const retriesRef = useRef(0);
-  const jobIdRef = useRef<string | null>(null);
-  const langRef = useRef<string | undefined>(undefined);
+  const sessionIdRef = useRef<string | null>(null);
 
-  const openStream = useCallback((jobId: string, lang?: string, isRetry = false) => {
+  const openStream = useCallback((sessionId: string, isRetry = false) => {
     esRef.current?.close();
 
     if (!isRetry) {
       retriesRef.current = 0;
-      jobIdRef.current = jobId;
-      langRef.current = lang;
+      sessionIdRef.current = sessionId;
       setState({ text: "", status: "connecting", segmentCount: 0, startedAt: Date.now() });
     } else {
       setState((prev) => ({ ...prev, status: "connecting" }));
     }
 
-    const es = new EventSource(buildStreamUrl(jobId, lang));
+    const es = new EventSource(buildStreamUrl(sessionId));
     esRef.current = es;
 
     es.onopen = () => setState((prev) => ({ ...prev, status: "streaming" }));
@@ -75,7 +71,7 @@ export function useTranscriptionSSE(): UseTranscriptionSSEReturn {
         retriesRef.current += 1;
         const delay = 2 ** (retriesRef.current - 1) * 1000;
         setTimeout(() => {
-          if (jobIdRef.current) openStream(jobIdRef.current, langRef.current, true);
+          if (sessionIdRef.current) openStream(sessionIdRef.current, true);
         }, delay);
       } else {
         setState((prev) => ({ ...prev, status: "error" }));
@@ -84,7 +80,7 @@ export function useTranscriptionSSE(): UseTranscriptionSSEReturn {
   }, []);
 
   const startStream = useCallback(
-    (jobId: string, lang?: string) => openStream(jobId, lang),
+    (sessionId: string) => openStream(sessionId),
     [openStream],
   );
 
@@ -92,8 +88,7 @@ export function useTranscriptionSSE(): UseTranscriptionSSEReturn {
     esRef.current?.close();
     setState(IDLE);
     retriesRef.current = 0;
-    jobIdRef.current = null;
-    langRef.current = undefined;
+    sessionIdRef.current = null;
   }, []);
 
   // Cleanup only: close EventSource on unmount
