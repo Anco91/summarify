@@ -1,15 +1,20 @@
+import Image from "next/image";
 import { UploadForm } from "@/features/audio-upload/components/UploadForm";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-slate-50 py-12 dark:bg-slate-900">
+    <main className="min-h-screen bg-background py-12">
       <div className="mx-auto max-w-3xl px-4">
-        <header className="mb-10 text-center">
-          <h1 className="text-4xl font-bold tracking-tight text-indigo-600 dark:text-indigo-400">
-            Summarify
-          </h1>
-          <p className="mt-2 text-slate-500 dark:text-slate-400">
-            Transcription audio en temps réel · Résumé IA · Export PDF
+        <header className="mb-10 flex flex-col items-center gap-3">
+          <Image
+            src="/logo_summarify_wt_back.svg"
+            alt="Summarify"
+            width={220}
+            height={64}
+            priority
+          />
+          <p className="text-sm text-muted-foreground">
+            Transcription audio en temps réel · Résumé IA
           </p>
         </header>
         <UploadForm />

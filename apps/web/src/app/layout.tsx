@@ -7,8 +7,9 @@ import { cn } from "@/lib/utils";
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
-  title: "Summarify — Transcription audio en temps reel",
-  description: "Transcrivez vos fichiers audio en temps reel avec IA",
+  title: "Summarify — Transcription audio en temps réel",
+  description: "Transcrivez vos fichiers audio en temps réel avec IA",
+  icons: { icon: "/logo_summarify_wt_back.svg" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
