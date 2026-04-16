@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { UploadForm } from "@/features/audio-upload/components/UploadForm";
+import { UploadForm } from "@/features/transcription/components/UploadForm";
 
 export default function Home() {
   return (

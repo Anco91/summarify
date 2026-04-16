@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type { SSEStatus } from "../hooks/useTranscriptionSSE";
 
-interface TranscriptionViewerProps {
+interface TranscriptionPanelProps {
   text: string;
   status: SSEStatus;
   segmentCount: number;
@@ -26,7 +26,7 @@ function formatElapsed(startedAt: number | null): string {
   return `${mm}:${ss}`;
 }
 
-export function TranscriptionViewer({ text, status, segmentCount, startedAt }: TranscriptionViewerProps) {
+export function TranscriptionPanel({ text, status, segmentCount, startedAt }: TranscriptionPanelProps) {
   const [copied, setCopied] = useState(false);
   const isActive = status === "connecting" || status === "streaming";
   const statusLabel = STATUS_LABEL[status];

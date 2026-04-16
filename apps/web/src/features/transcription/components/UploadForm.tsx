@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { SummaryActions } from "@/features/summary/components/SummaryActions";
 import { SummaryPanel } from "@/features/summary/components/SummaryPanel";
 import { useSummaryMutation } from "@/features/summary/hooks/useSummaryMutation";
 import { clearSession, loadSession } from "../hooks/useUploadMutation";
@@ -8,7 +9,7 @@ import { useTranscriptionSSE } from "../hooks/useTranscriptionSSE";
 import { useUploadMutation } from "../hooks/useUploadMutation";
 import { AudioUploadForm } from "./AudioUploadForm";
 import { TranscriptionActions } from "./TranscriptionActions";
-import { TranscriptionViewer } from "./TranscriptionViewer";
+import { TranscriptionPanel } from "./TranscriptionPanel";
 
 export function UploadForm() {
   const sse = useTranscriptionSSE();
@@ -68,7 +69,7 @@ export function UploadForm() {
         </Alert>
       )}
 
-      <TranscriptionViewer
+      <TranscriptionPanel
         text={sse.text}
         status={sse.status}
         segmentCount={sse.segmentCount}
@@ -76,13 +77,14 @@ export function UploadForm() {
       />
 
       {sse.status === "done" && sse.text && (
-        <TranscriptionActions
-          text={sse.text}
-          filename={filename}
-          summary={summary.data?.summary}
-          onSummarize={() => summary.summarize(sse.text)}
-          isSummarizing={summary.isPending}
-        />
+        <div className="flex flex-wrap gap-3">
+          <TranscriptionActions text={sse.text} filename={filename} />
+          <SummaryActions
+            onSummarize={() => summary.summarize(sse.text)}
+            isSummarizing={summary.isPending}
+            disabled={!sse.text}
+          />
+        </div>
       )}
 
       {summary.data && (

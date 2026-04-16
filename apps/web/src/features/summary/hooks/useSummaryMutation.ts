@@ -11,10 +11,8 @@ export function useSummaryMutation() {
     mutation.mutate({ data: { text } });
   };
 
-  // Orval wraps response: { data: SummarizeResponse, status: 200, headers }
-  const response = mutation.data;
-  const data: SummarizeResponse | undefined =
-    response && "data" in response ? response.data : undefined;
+  // customInstance extrait déjà .data de la réponse Axios → mutation.data IS SummarizeResponse
+  const data = mutation.data as SummarizeResponse | undefined;
 
   return {
     summarize,

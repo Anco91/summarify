@@ -3,9 +3,9 @@ from openai import AsyncOpenAI
 from src.domain.summary.ports import ILLMService
 
 _SYSTEM_PROMPT = (
-    "Tu es un assistant de synthese. Resume le texte fourni en "
-    "3 points cles concis. N'invente aucune information. "
-    "Reponds uniquement avec les points cles, sans introduction."
+    "Summarize the following text in 3 concise key points. "
+    "Respond in the same language as the input text. "
+    "Do not invent any information. Output only the key points, no introduction."
 )
 
 

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { generatePdf } from "@/features/audio-upload/utils/generatePdf";
+import { generatePdf } from "@/features/transcription/utils/generatePdf";
 
 interface SummaryPanelProps {
   summary: string;
