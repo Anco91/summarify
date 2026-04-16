@@ -15,7 +15,7 @@ export interface UseTranscriptionSSEReturn extends TranscriptionState {
   reset: () => void;
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
 const MAX_RETRIES = 3;
 
 const IDLE: TranscriptionState = {
