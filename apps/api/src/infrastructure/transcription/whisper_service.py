@@ -10,8 +10,9 @@ from src.domain.transcription.ports import ITranscriptionPort
 
 logger = get_logger(__name__)
 
-# En dev local, /app/models n'existe pas — on autorise le téléchargement
-_LOCAL_DEV = not os.path.isdir("/app/models")
+# En prod Docker, les modèles sont pré-téléchargés dans /app/models.
+# En dev local, on utilise le cache HuggingFace par défaut (~/.cache).
+_MODELS_DIR: str | None = "/app/models" if os.path.isdir("/app/models") else None
 
 
 class WhisperService(ITranscriptionPort):
@@ -33,8 +34,9 @@ class WhisperService(ITranscriptionPort):
             settings.WHISPER_MODEL,
             device="cpu",
             compute_type="int8",
-            download_root="/app/models" if not _LOCAL_DEV else None,
-            local_files_only=not _LOCAL_DEV,
+            download_root=_MODELS_DIR,
+            # local_files_only omis : faster-whisper télécharge si le modèle
+            # n'est pas en cache (ex. WHISPER_MODEL diffère de l'ARG Docker).
         )
         self._initialized = True
         logger.info("whisper_ready", model=settings.WHISPER_MODEL)

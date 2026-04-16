@@ -13,7 +13,8 @@ RUN uv sync --frozen --no-dev
 # Stage : pre-telechargement du modele Whisper
 FROM deps AS model
 # Ce stage est mis en cache par Docker : ne se relance que si pyproject.toml change
-RUN uv run python -c "from faster_whisper import WhisperModel; print('Telechargement du modele Whisper base...'); model = WhisperModel('base', download_root='/app/models'); print('Modele telecharge et cache dans /app/models')"
+ARG WHISPER_MODEL=tiny
+RUN uv run python -c "from faster_whisper import WhisperModel; print('Telechargement du modele Whisper ${WHISPER_MODEL}...'); model = WhisperModel('${WHISPER_MODEL}', download_root='/app/models'); print('Modele telecharge et cache dans /app/models')"
 
 # Stage final
 FROM model AS final
